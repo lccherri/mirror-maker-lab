@@ -1,0 +1,80 @@
+version: '3'
+
+services:
+  kafka-source:
+    image: registry.redhat.io/amq-streams/kafka-41-rhel9@sha256:e2a2d7a93678a4de948fc6bde45e2b251aa129a691f555c93003fef50cac1027
+    container_name: kafka-source
+    user: "1001"
+    command: ["/bin/bash", "/scripts/run_kafka.sh", "source", "/config/server.properties", "MkU3OEVBNTcwNTJENDM2Qk"]
+    volumes:
+      - ./config/source/server.properties:/config/server.properties:z
+      - ./scripts/run_kafka.sh:/scripts/run_kafka.sh:z
+      # Volume de DADOS (Store)
+      - ./data/source-data:/var/lib/kafka/data:z
+      # Volume de LOGS (Fix JVM Error)
+      - ./data/source-logs:/opt/kafka/logs:z
+    ports:
+      - "29092:29092"
+
+  kafka-target:
+    image: registry.redhat.io/amq-streams/kafka-41-rhel9@sha256:e2a2d7a93678a4de948fc6bde45e2b251aa129a691f555c93003fef50cac1027
+    container_name: kafka-target
+    user: "1001"
+    command: ["/bin/bash", "/scripts/run_kafka.sh", "target", "/config/server.properties", "NzA5MkI0NTc5M0U2NzUyND"]
+    volumes:
+      - ./config/target/server.properties:/config/server.properties:z
+      - ./scripts/run_kafka.sh:/scripts/run_kafka.sh:z
+      # Volume de DADOS
+      - ./data/target-data:/var/lib/kafka/data:z
+      # Volume de LOGS
+      - ./data/target-logs:/opt/kafka/logs:z
+    ports:
+      - "29093:29093"
+
+  mirror-maker:
+    image: registry.redhat.io/amq-streams/kafka-41-rhel9@sha256:e2a2d7a93678a4de948fc6bde45e2b251aa129a691f555c93003fef50cac1027
+    container_name: mirror-maker
+    user: "1001"
+    depends_on:
+      - kafka-source
+      - kafka-target
+    command: >
+      /opt/kafka/bin/connect-mirror-maker.sh /config/mm2.properties
+    environment:
+      - KAFKA_OPTS=-javaagent:/libs/jmx_prometheus_javaagent.jar=9404:/config/metrics.yaml
+      # Redirecionar logs do MM2 também se necessário, mas geralmente ele joga no stdout
+    volumes:
+      - ./config/mm2/mm2.properties:/config/mm2.properties:z
+      - ./config/mm2/metrics.yaml:/config/metrics.yaml:z
+      - ./libs/jmx_prometheus_javaagent.jar:/libs/jmx_prometheus_javaagent.jar:z
+    ports:
+      - "9404:9404"
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:z
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: docker.io/grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      # 1. Monta a configuração do Datasource (Prometheus)
+      - ./config/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      
+      # 2. Monta a configuração do Provider (Loader de Dashboard)
+      - ./config/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      
+      # 3. Monta o arquivo JSON do dashboard em si
+      - ./config/grafana/dashboards-json:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus

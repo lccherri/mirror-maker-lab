@@ -1,0 +1,27 @@
+lowercaseOutputName: true
+rules:
+  # --- 1. LAG (Consumidor Interno) ---
+  - pattern: "kafka.consumer<type=consumer-fetch-manager-metrics, client-id=(.+), topic=(.+), partition=([0-9]+)><>records-lag"
+    name: "kafka_consumer_fetch_manager_records_lag"
+    labels:
+      client_id: "$1"
+      topic: "$2"
+      partition: "$3"
+
+  # --- 2. LATÊNCIA E TAXAS (MirrorSourceConnector) ---
+  # Captura: replication-latency-ms, byte-rate, record-rate, etc.
+  - pattern: "kafka.connect.mirror<type=MirrorSourceConnector, source=(.+), target=(.+), topic=(.+), partition=([0-9]+)><>(replication-latency-ms|replication-latency-ms-max|replication-latency-ms-avg|replication-latency-ms-min|byte-rate|record-rate)"
+    name: "kafka_connect_mirror_source_connector_$5"
+    labels:
+      source: "$1"
+      target: "$2"
+      topic: "$3"
+      partition: "$4"
+
+  # --- 3. STATUS (MirrorHeartbeatConnector) ---
+  - pattern: "kafka.connect.mirror<type=MirrorHeartbeatConnector, target=(.+), topic=(.+), partition=([0-9]+)><>(.+)"
+    name: "kafka_connect_mirror_heartbeat_connector_$4"
+    labels:
+      target: "$1"
+      topic: "$2"
+      partition: "$3"
