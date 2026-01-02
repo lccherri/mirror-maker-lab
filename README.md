@@ -16,9 +16,7 @@ The lab consists of the following isolated components:
 
 ## Prerequisites
 
-* Linux OS or WSL2.
 * **Podman** and **podman-compose** (or Docker/Docker Compose).
-* `curl` and `git`.
 
 ## Installation & Setup
 
